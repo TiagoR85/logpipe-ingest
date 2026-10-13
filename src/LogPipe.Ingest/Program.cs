@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using LogPipe.Ingest.Api;
 using LogPipe.Ingest.Auth;
+using LogPipe.Ingest.Forwarding;
 using LogPipe.Ingest.Pipeline;
 using LogPipe.Ingest.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -91,6 +92,9 @@ builder.Services.AddSingleton<LogEntryChannel>();
 builder.Services.AddSingleton<RateLimiter>();
 builder.Services.AddSingleton<Deduplicator>();
 builder.Services.AddSingleton<LogIngestService>();
+
+builder.Services.AddSingleton<ILogBatchClient, GrpcLogBatchClient>();
+builder.Services.AddHostedService<BatchForwarder>();
 
 builder.Services.AddSingleton<RedisHealthCheck>();
 builder.Services.AddHealthChecks()
