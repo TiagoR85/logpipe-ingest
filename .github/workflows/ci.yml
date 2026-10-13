@@ -19,3 +19,9 @@ jobs:
     uses: TiagoR85/ci-pipeline-templates/.github/workflows/reusable-docker-scan.yml@v1
     with:
       image-name: logpipe-ingest
+
+  docker-scan-producer:
+    uses: TiagoR85/ci-pipeline-templates/.github/workflows/reusable-docker-scan.yml@v1
+    with:
+      image-name: logpipe-sample-producer
+      dockerfile: samples/LogPipe.SampleProducer/Dockerfile
