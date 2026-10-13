@@ -6,7 +6,7 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 $project = 'src/LogPipe.Contracts/LogPipe.Contracts.csproj'
 $packed = $false
 try {
-    $tmp = Join-Path $env:TEMP ("logpipe-contracts-" + [guid]::NewGuid().ToString('N'))
+    $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("logpipe-contracts-" + [guid]::NewGuid().ToString('N'))
     git clone --depth 1 --branch $Ref https://github.com/TiagoR85/logpipe-contracts.git $tmp 2>$null
     if ($LASTEXITCODE -ne 0) { throw "git clone of tag $Ref failed" }
     dotnet pack (Join-Path $tmp $project) -c Release -o $out
