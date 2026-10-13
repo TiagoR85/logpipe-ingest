@@ -8,7 +8,7 @@ Ingest tier of the logpipe family: accepts log batches over authenticated REST, 
 ```mermaid
 graph LR
     producer[producers<br/>sample / external] -->|POST /v1/logs<br/>Bearer logs:write| ingest[logpipe-ingest<br/>:8090]
-    ingest -->|gRPC StreamLogs| search[logpipe-search<br/>:8091]
+    ingest -->|gRPC StreamLogs| search[logpipe-search<br/>:8093]
     ingest -.-> redis[(Redis<br/>rate limit / queue)]
     ingest -.->|/metrics| prom[Prometheus]
 ```
