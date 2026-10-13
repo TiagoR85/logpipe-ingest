@@ -85,7 +85,11 @@ builder.Services.AddOpenIddict()
 builder.Services.AddAuthentication(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme);
 builder.Services.AddAuthorization(options => options.AddLogPipePolicies());
 
+builder.Services.AddSingleton<IDatabase>(sp => sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
+
 builder.Services.AddSingleton<LogEntryChannel>();
+builder.Services.AddSingleton<RateLimiter>();
+builder.Services.AddSingleton<Deduplicator>();
 builder.Services.AddSingleton<LogIngestService>();
 
 builder.Services.AddSingleton<RedisHealthCheck>();

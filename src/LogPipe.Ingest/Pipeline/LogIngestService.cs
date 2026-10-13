@@ -6,16 +6,22 @@ namespace LogPipe.Ingest.Pipeline;
 
 public sealed record IngestOutcome(int Accepted, int Rejected, bool RateLimited, string? ValidationFailure);
 
-public sealed class LogIngestService(LogEntryChannel channel)
+public sealed class LogIngestService(
+    LogEntryChannel channel,
+    RateLimiter rateLimiter,
+    Deduplicator deduplicator,
+    ILogger<LogIngestService> logger)
 {
-    public Task<IngestOutcome> IngestAsync(string clientId, IReadOnlyList<LogEntryDto> dtos, CancellationToken ct)
+    public async Task<IngestOutcome> IngestAsync(
+        string clientId, IReadOnlyList<LogEntryDto> dtos, CancellationToken ct)
     {
-        var proto = new List<LogEntry>(dtos.Count);
+        var proto = new List<(LogEntry Entry, bool IdFromClient)>(dtos.Count);
         foreach (var dto in dtos)
         {
+            var idFromClient = !string.IsNullOrWhiteSpace(dto.Id);
             var entry = new LogEntry
             {
-                Id = string.IsNullOrWhiteSpace(dto.Id) ? Guid.NewGuid().ToString() : dto.Id!,
+                Id = idFromClient ? dto.Id! : Guid.NewGuid().ToString(),
                 Timestamp = string.IsNullOrWhiteSpace(dto.Timestamp)
                     ? DateTimeOffset.UtcNow.ToString("O")
                     : dto.Timestamp!,
@@ -31,17 +37,42 @@ public sealed class LogIngestService(LogEntryChannel channel)
             }
 
             if (!LogEntryRules.TryValidate(entry, out var reason))
-                return Task.FromResult(new IngestOutcome(0, 0, false, reason));
+            {
+                logger.LogWarning("Rejected batch: {Reason}", reason);
+                return new IngestOutcome(0, 0, false, reason);
+            }
 
-            proto.Add(entry);
+            proto.Add((entry, idFromClient));
+        }
+
+        if (!await rateLimiter.TryAcquireAsync(clientId, proto.Count, ct))
+        {
+            IngestMetrics.RateLimited.Add(proto.Count);
+            return new IngestOutcome(0, 0, true, null);
         }
 
         var accepted = 0;
-        foreach (var entry in proto)
+        var rejected = 0;
+        foreach (var (entry, idFromClient) in proto)
         {
-            if (channel.TryWrite(entry)) accepted++;
+            if (await deduplicator.IsDuplicateAsync(entry, idFromClient, ct))
+            {
+                rejected++;
+                IngestMetrics.Rejected.Add(1);
+                continue;
+            }
+
+            if (!channel.TryWrite(entry))
+            {
+                rejected++;
+                IngestMetrics.Dropped.Add(1);
+                continue;
+            }
+
+            accepted++;
+            IngestMetrics.Accepted.Add(1);
         }
 
-        return Task.FromResult(new IngestOutcome(accepted, proto.Count - accepted, false, null));
+        return new IngestOutcome(accepted, rejected, false, null);
     }
 }
